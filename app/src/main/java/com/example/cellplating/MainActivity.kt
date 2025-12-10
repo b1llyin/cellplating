@@ -3,7 +3,6 @@ package com.example.cellplating
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -43,6 +42,7 @@ fun CellPlatingRecipePage() {
     var cellsVolume by remember { mutableStateOf("") }
     var selectedFlask by remember { mutableStateOf("T75") }
 
+    // Single source of truth: only per cm² values are editable
     var cellsPerCm2 by remember { mutableStateOf("0.028") }
     var mediaPerCm2 by remember { mutableStateOf("0.2") }
 
@@ -55,9 +55,12 @@ fun CellPlatingRecipePage() {
 
     val flaskArea = flaskAreas[selectedFlask] ?: 75
 
-    // Calculate per flask values
-    val cellsPerFlask = (cellsPerCm2.toDoubleOrNull() ?: 0.028) * flaskArea
-    val mediaPerFlask = (mediaPerCm2.toDoubleOrNull() ?: 0.2) * flaskArea
+    // Computed values (read-only)
+    val cellsPerCm2Value = cellsPerCm2.toDoubleOrNull() ?: 0.0
+    val mediaPerCm2Value = mediaPerCm2.toDoubleOrNull() ?: 0.0
+
+    val cellsPerFlask = cellsPerCm2Value * flaskArea
+    val mediaPerFlask = mediaPerCm2Value * flaskArea
 
     // Calculate recipe values
     val harvested = cellsHarvested.toDoubleOrNull() ?: 0.0
@@ -160,9 +163,9 @@ fun CellPlatingRecipePage() {
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Density Table
+                // Seeding Parameters
                 Text(
-                    text = "Density Table",
+                    text = "Seeding Parameters",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium
                 )
@@ -173,13 +176,7 @@ fun CellPlatingRecipePage() {
                     mediaPerCm2 = mediaPerCm2,
                     onMediaPerCm2Change = { mediaPerCm2 = it },
                     cellsPerFlask = cellsPerFlask,
-                    onCellsPerFlaskChange = { newValue ->
-                        cellsPerCm2 = (newValue / flaskArea).toString()
-                    },
-                    mediaPerFlask = mediaPerFlask,
-                    onMediaPerFlaskChange = { newValue ->
-                        mediaPerCm2 = (newValue / flaskArea).toString()
-                    }
+                    mediaPerFlask = mediaPerFlask
                 )
             }
         }
@@ -218,9 +215,7 @@ fun DensityTable(
     mediaPerCm2: String,
     onMediaPerCm2Change: (String) -> Unit,
     cellsPerFlask: Double,
-    onCellsPerFlaskChange: (Double) -> Unit,
-    mediaPerFlask: Double,
-    onMediaPerFlaskChange: (Double) -> Unit
+    mediaPerFlask: Double
 ) {
     Column(
         modifier = Modifier
@@ -249,7 +244,10 @@ fun DensityTable(
         HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 
         // M cells Row
-        Row(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             TableCell(
                 text = "M cells",
                 isHeader = true,
@@ -260,11 +258,9 @@ fun DensityTable(
                 onValueChange = onCellsPerCm2Change,
                 modifier = Modifier.weight(1f)
             )
-            EditableTableCell(
-                value = String.format("%.3f", cellsPerFlask),
-                onValueChange = {
-                    it.toDoubleOrNull()?.let { value -> onCellsPerFlaskChange(value) }
-                },
+            ReadOnlyTableCell(
+                value = cellsPerFlask,
+                decimalPlaces = 1,
                 modifier = Modifier.weight(1f)
             )
         }
@@ -272,7 +268,10 @@ fun DensityTable(
         HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 
         // ml media Row
-        Row(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             TableCell(
                 text = "ml media",
                 isHeader = true,
@@ -283,11 +282,9 @@ fun DensityTable(
                 onValueChange = onMediaPerCm2Change,
                 modifier = Modifier.weight(1f)
             )
-            EditableTableCell(
-                value = String.format("%.1f", mediaPerFlask),
-                onValueChange = {
-                    it.toDoubleOrNull()?.let { value -> onMediaPerFlaskChange(value) }
-                },
+            ReadOnlyTableCell(
+                value = mediaPerFlask,
+                decimalPlaces = 1,
                 modifier = Modifier.weight(1f)
             )
         }
@@ -325,13 +322,13 @@ fun RecipeTable(
         // Cell suspension Row
         Row(modifier = Modifier.fillMaxWidth()) {
             TableCell(
-                text = "Cell suspension",
+                text = "Cell Suspension",
                 isHeader = false,
                 modifier = Modifier.weight(1f),
                 color = MaterialTheme.colorScheme.onPrimaryContainer
             )
             TableCell(
-                text = String.format("%.2f", cellSuspensionVolume),
+                text = String.format("%.1f", cellSuspensionVolume),
                 isHeader = false,
                 modifier = Modifier.weight(1f),
                 color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -349,7 +346,7 @@ fun RecipeTable(
                 color = MaterialTheme.colorScheme.onPrimaryContainer
             )
             TableCell(
-                text = String.format("%.2f", maxOf(0.0, mediaVolume)),
+                text = String.format("%.1f", maxOf(0.0, mediaVolume)),
                 isHeader = false,
                 modifier = Modifier.weight(1f),
                 color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -366,8 +363,7 @@ fun TableCell(
     color: Color = Color.Unspecified
 ) {
     Box(
-        modifier = modifier
-            .padding(12.dp),
+        modifier = modifier.padding(12.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
@@ -402,6 +398,26 @@ fun EditableTableCell(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp)
+        )
+    }
+}
+
+@Composable
+fun ReadOnlyTableCell(
+    value: Double,
+    decimalPlaces: Int,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier.padding(12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = String.format("%.${decimalPlaces}f", value),
+            textAlign = TextAlign.Center,
+            fontSize = 14.sp,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+            fontWeight = FontWeight.Normal
         )
     }
 }
