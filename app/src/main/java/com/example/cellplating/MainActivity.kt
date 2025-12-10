@@ -6,14 +6,18 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -38,9 +42,13 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CellPlatingRecipePage() {
+    val focusManager = LocalFocusManager.current
+
     var cellsHarvested by remember { mutableStateOf("") }
     var cellsVolume by remember { mutableStateOf("") }
     var selectedFlask by remember { mutableStateOf("T75") }
+    var customArea by remember { mutableStateOf("") }
+    var showCustomDialog by remember { mutableStateOf(false) }
 
     // Single source of truth: only per cm² values are editable
     var cellsPerCm2 by remember { mutableStateOf("0.028") }
@@ -53,7 +61,10 @@ fun CellPlatingRecipePage() {
         "T225" to 225
     )
 
-    val flaskArea = flaskAreas[selectedFlask] ?: 75
+    val flaskArea = when (selectedFlask) {
+        "Custom" -> customArea.toIntOrNull() ?: 0
+        else -> flaskAreas[selectedFlask] ?: 75
+    }
 
     // Computed values (read-only)
     val cellsPerCm2Value = cellsPerCm2.toDoubleOrNull() ?: 0.0
@@ -74,138 +85,245 @@ fun CellPlatingRecipePage() {
 
     val mediaVolume = mediaPerFlask - cellSuspensionVolume
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp)
-    ) {
-        // Header
-        Text(
-            text = "Cell Plating Recipe",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold
-        )
-
-        // Cell Suspension Specification
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = "Cell Plating Recipe",
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
             )
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text(
-                    text = "Cell Suspension Specification",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-
-                OutlinedTextField(
-                    value = cellsHarvested,
-                    onValueChange = { cellsHarvested = it },
-                    label = { Text("Cells Harvested (millions)") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                OutlinedTextField(
-                    value = cellsVolume,
-                    onValueChange = { cellsVolume = it },
-                    label = { Text("Cells Volume (mL)") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
         }
-
-        // Plating Specification
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
-            )
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(paddingValues)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+            // Cell Suspension Specification
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
             ) {
-                Text(
-                    text = "Plating Specification",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-
-                // Flask Selection
-                Text(
-                    text = "Flask Selection",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    flaskAreas.keys.forEach { flask ->
+                    Text(
+                        text = "Cell Suspension Specification",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+
+                    OutlinedTextField(
+                        value = cellsHarvested,
+                        onValueChange = { cellsHarvested = it },
+                        label = { Text("Cells Harvested (millions)") },
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Decimal,
+                            imeAction = ImeAction.Next
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onNext = { focusManager.moveFocus(FocusDirection.Down) }
+                        ),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = cellsVolume,
+                        onValueChange = { cellsVolume = it },
+                        label = { Text("Cells Volume (mL)") },
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Decimal,
+                            imeAction = ImeAction.Next
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onNext = { focusManager.moveFocus(FocusDirection.Down) }
+                        ),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
+            // Plating Specification
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "Plating Specification",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+
+                    // Flask Selection
+                    Text(
+                        text = "Flask Selection",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        flaskAreas.keys.forEach { flask ->
+                            FilterChip(
+                                selected = selectedFlask == flask,
+                                onClick = { selectedFlask = flask },
+                                label = { Text(flask) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         FilterChip(
-                            selected = selectedFlask == flask,
-                            onClick = { selectedFlask = flask },
-                            label = { Text(flask) },
-                            modifier = Modifier.weight(1f)
+                            selected = selectedFlask == "Custom",
+                            onClick = {
+                                selectedFlask = "Custom"
+                                showCustomDialog = true
+                            },
+                            label = {
+                                Text(if (selectedFlask == "Custom" && customArea.isNotEmpty()) {
+                                    "Custom (${customArea} cm²)"
+                                } else {
+                                    "Custom"
+                                })
+                            },
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Seeding Parameters
+                    Text(
+                        text = "Seeding Parameters",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+
+                    DensityTable(
+                        cellsPerCm2 = cellsPerCm2,
+                        onCellsPerCm2Change = { cellsPerCm2 = it },
+                        mediaPerCm2 = mediaPerCm2,
+                        onMediaPerCm2Change = { mediaPerCm2 = it },
+                        cellsPerFlask = cellsPerFlask,
+                        mediaPerFlask = mediaPerFlask,
+                        focusManager = focusManager
+                    )
                 }
+            }
 
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Seeding Parameters
-                Text(
-                    text = "Seeding Parameters",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium
+            // Recipe
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
                 )
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "Recipe",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
 
-                DensityTable(
-                    cellsPerCm2 = cellsPerCm2,
-                    onCellsPerCm2Change = { cellsPerCm2 = it },
-                    mediaPerCm2 = mediaPerCm2,
-                    onMediaPerCm2Change = { mediaPerCm2 = it },
-                    cellsPerFlask = cellsPerFlask,
-                    mediaPerFlask = mediaPerFlask
-                )
+                    RecipeTable(
+                        cellSuspensionVolume = cellSuspensionVolume,
+                        mediaVolume = mediaVolume
+                    )
+                }
             }
         }
 
-        // Recipe
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer
+        // Custom Area Dialog
+        if (showCustomDialog) {
+            CustomFlaskDialog(
+                currentValue = customArea,
+                onDismiss = {
+                    showCustomDialog = false
+                    if (customArea.isEmpty()) {
+                        selectedFlask = "T75"
+                    }
+                },
+                onConfirm = { value ->
+                    customArea = value
+                    showCustomDialog = false
+                }
             )
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text(
-                    text = "Recipe",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-
-                RecipeTable(
-                    cellSuspensionVolume = cellSuspensionVolume,
-                    mediaVolume = mediaVolume
-                )
-            }
         }
     }
+}
+
+@Composable
+fun CustomFlaskDialog(
+    currentValue: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var value by remember { mutableStateOf(currentValue) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Custom Flask Area") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Enter the surface area in cm²:")
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = { value = it },
+                    label = { Text("Surface Area (cm²)") },
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Number,
+                        imeAction = ImeAction.Done
+                    ),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(value) },
+                enabled = value.isNotEmpty() && value.toIntOrNull() != null && value.toInt() > 0
+            ) {
+                Text("OK")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 @Composable
@@ -215,7 +333,8 @@ fun DensityTable(
     mediaPerCm2: String,
     onMediaPerCm2Change: (String) -> Unit,
     cellsPerFlask: Double,
-    mediaPerFlask: Double
+    mediaPerFlask: Double,
+    focusManager: androidx.compose.ui.focus.FocusManager
 ) {
     Column(
         modifier = Modifier
@@ -256,7 +375,9 @@ fun DensityTable(
             EditableTableCell(
                 value = cellsPerCm2,
                 onValueChange = onCellsPerCm2Change,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                focusManager = focusManager,
+                isLast = false
             )
             ReadOnlyTableCell(
                 value = cellsPerFlask,
@@ -280,7 +401,9 @@ fun DensityTable(
             EditableTableCell(
                 value = mediaPerCm2,
                 onValueChange = onMediaPerCm2Change,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                focusManager = focusManager,
+                isLast = true
             )
             ReadOnlyTableCell(
                 value = mediaPerFlask,
@@ -380,7 +503,9 @@ fun TableCell(
 fun EditableTableCell(
     value: String,
     onValueChange: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    focusManager: androidx.compose.ui.focus.FocusManager,
+    isLast: Boolean
 ) {
     Box(
         modifier = modifier.padding(4.dp),
@@ -389,7 +514,14 @@ fun EditableTableCell(
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Decimal,
+                imeAction = if (isLast) ImeAction.Done else ImeAction.Next
+            ),
+            keyboardActions = KeyboardActions(
+                onNext = { focusManager.moveFocus(FocusDirection.Down) },
+                onDone = { focusManager.clearFocus() }
+            ),
             singleLine = true,
             textStyle = LocalTextStyle.current.copy(
                 textAlign = TextAlign.Center,
