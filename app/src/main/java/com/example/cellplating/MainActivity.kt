@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
@@ -49,6 +50,7 @@ fun CellPlatingRecipePage() {
     var selectedFlask by remember { mutableStateOf("T75") }
     var customArea by remember { mutableStateOf("") }
     var showCustomDialog by remember { mutableStateOf(false) }
+    var seedingExpanded by remember { mutableStateOf(true) }
 
     // Single source of truth: only per cm² values are editable
     var cellsPerCm2 by remember { mutableStateOf("0.028") }
@@ -220,21 +222,38 @@ fun CellPlatingRecipePage() {
                     Spacer(modifier = Modifier.height(8.dp))
 
                     // Seeding Parameters
-                    Text(
-                        text = "Seeding Parameters",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium
-                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { seedingExpanded = !seedingExpanded }
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Seeding Parameters",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = if (seedingExpanded) "▲" else "▼",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
 
-                    DensityTable(
-                        cellsPerCm2 = cellsPerCm2,
-                        onCellsPerCm2Change = { cellsPerCm2 = it },
-                        mediaPerCm2 = mediaPerCm2,
-                        onMediaPerCm2Change = { mediaPerCm2 = it },
-                        cellsPerFlask = cellsPerFlask,
-                        mediaPerFlask = mediaPerFlask,
-                        focusManager = focusManager
-                    )
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = seedingExpanded
+                    ) {
+                        DensityTable(
+                            cellsPerCm2 = cellsPerCm2,
+                            onCellsPerCm2Change = { cellsPerCm2 = it },
+                            mediaPerCm2 = mediaPerCm2,
+                            onMediaPerCm2Change = { mediaPerCm2 = it },
+                            cellsPerFlask = cellsPerFlask,
+                            mediaPerFlask = mediaPerFlask,
+                            focusManager = focusManager
+                        )
+                    }
                 }
             }
 
